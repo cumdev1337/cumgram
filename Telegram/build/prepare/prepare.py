@@ -449,7 +449,7 @@ if customRunCommand:
                 tmp_zshrc_path = tmp_zshrc.name
             subprocess.run(['zsh', '--rcs', tmp_zshrc_path], env=modifiedEnv)
             os.remove(tmp_zshrc_path)
-    elif not run(command):
+    elif not run(' '.join(runCommand) + '\n'):
         print('FAILED :(')
         finish(1)
     finish(0)
@@ -457,7 +457,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 85a1c4ec32
+    git checkout e66e768a5f
 """)
 
 stage('msys64', """
@@ -1539,11 +1539,20 @@ release:
     stage('qt_' + qt, """
     git clone -b v$QT-lts-lgpl https://github.com/qt/qt5.git qt_$QT
     cd qt_$QT
-    git submodule update --init --recursive qtbase qtimageformats qtsvg
+    git submodule update --init --recursive --progress qtbase qtimageformats qtsvg
 depends:patches/qtbase_""" + qt + """/*.patch
     cd qtbase
 win:
-    for /r %%i in (..\\..\\patches\\qtbase_%QT%\\*) do git apply %%i -v
+    git revert --no-edit 6ad56dce34
+    setlocal enabledelayedexpansion
+    for /r %%i in (..\\..\\patches\\qtbase_%QT%\\*) do (
+        git apply %%i -v
+        if errorlevel 1 (
+            echo ERROR: Applying patch %%~nxi failed!
+            exit /b 1
+        )
+    )
+
     cd ..
 
     SET CONFIGURATIONS=-debug
@@ -1620,7 +1629,7 @@ mac:
     make install
 """)
 else: # qt > '6'
-    branch = 'v$QT' + ('-lts-lgpl' if qt < '6.3' else '')
+    branch = 'v$QT' + ('-lts-lgpl' if qt < '6.3' else '-beta4')
     stage('qt_' + qt, """
     git clone -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
     cd qt_$QT
@@ -1718,7 +1727,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout c0ba7b391c
+    git checkout 4a60ce1ab9
     git submodule init
     git submodule update
 win:
@@ -1829,6 +1838,30 @@ release:
     cd ..
     mkdir Release
     lipo -create Release.arm64/libtg_owt.a Release.x86_64/libtg_owt.a -output Release/libtg_owt.a
+""")
+
+stage('ada', """
+    git clone -b v2.9.0 https://github.com/ada-url/ada.git
+    cd ada
+win:
+    cmake -B out . ^
+        -A %WIN32X64% ^
+        -D ADA_TESTING=OFF ^
+        -D ADA_TOOLS=OFF ^
+        -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>" ^
+        -D CMAKE_C_FLAGS_DEBUG="/MTd /Zi /Ob0 /Od /RTC1" ^
+        -D CMAKE_C_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG"
+    cmake --build out --config Debug --parallel
+    cmake --build out --config Release --parallel
+mac:
+    CFLAGS="$UNGUARDED" CPPFLAGS="$UNGUARDED" cmake -B build . \\
+        -D ADA_TESTING=OFF \\
+        -D ADA_TOOLS=OFF \\
+        -D CMAKE_OSX_DEPLOYMENT_TARGET:STRING=$MACOSX_DEPLOYMENT_TARGET \\
+        -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \\
+        -D CMAKE_INSTALL_PREFIX:STRING=$USED_PREFIX
+    cmake --build build $MAKE_THREADS_CNT
+    cmake --install build
 """)
 
 stage('protobuf', """

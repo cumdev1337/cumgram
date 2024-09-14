@@ -284,6 +284,10 @@ stickersTrendingSubheaderFont: normalFont;
 stickersTrendingSubheaderFg: windowSubTextFg;
 stickersTrendingSubheaderTop: 31px;
 
+stickersHeaderBadgeFont: font(10px);
+stickersHeaderBadgeFontTop: 12px;
+stickersHeaderBadgeFontSkip: 12px;
+
 emojiPanButtonRight: 7px;
 emojiPanButtonTop: 8px;
 emojiPanButton: RoundButton(defaultActiveButton) {
@@ -292,7 +296,9 @@ emojiPanButton: RoundButton(defaultActiveButton) {
 	textTop: 2px;
 }
 emojiPanExpand: RoundButton(defaultActiveButton) {
-	font: font(12px bold);
+	style: TextStyle(semiboldTextStyle) {
+		font: font(12px bold);
+	}
 	width: -8px;
 	height: 19px;
 	textTop: 1px;
@@ -1409,6 +1415,22 @@ editTagLimit: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
 }
 
+editStickerSetNameField: InputField(defaultInputField) {
+	textMargins: margins(0px, 8px, 26px, 4px);
+	heightMin: 36px;
+	heightMax: 36px;
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+	placeholderFont: normalFont;
+}
+editStickerSetNameLoading: InfiniteRadialAnimation(defaultInfiniteRadialAnimation) {
+	color: lightButtonFg;
+	thickness: 2px;
+}
+
 paidStarIcon: icon {{ "settings/premium/star", creditsBg1 }};
 paidStarIconTop: 7px;
 paidAmountAbout: FlatLabel(defaultFlatLabel) {
@@ -1479,5 +1501,11 @@ pickLocationChooseOnMap: RoundButton(defaultActiveButton) {
 	height: 44px;
 	textTop: 11px;
 	width: -96px;
-	font: font(15px semibold);
+	style: TextStyle(semiboldTextStyle) {
+		font: font(15px semibold);
+	}
+}
+
+sendGifBox: Box(defaultBox) {
+	shadowIgnoreBottomSkip: true;
 }

@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "base/weak_ptr.h"
 #include "base/flags.h"
+#include "ui/rect_part.h"
+#include "ui/round_rect.h"
 #include "webview/webview_common.h"
 
 class QJsonObject;
@@ -30,12 +32,7 @@ struct Available;
 
 namespace Ui::BotWebView {
 
-struct MainButtonArgs {
-	bool isActive = false;
-	bool isVisible = false;
-	bool isProgressVisible = false;
-	QString text;
-};
+[[nodiscard]] TextWithEntities ErrorText(const Webview::Available &info);
 
 enum class MenuButton {
 	None               = 0x00,
@@ -70,7 +67,7 @@ public:
 	virtual void botAllowWriteAccess(Fn<void(bool allowed)> callback) = 0;
 	virtual void botSharePhone(Fn<void(bool shared)> callback) = 0;
 	virtual void botInvokeCustomMethod(CustomMethodRequest request) = 0;
-	virtual void botShareGameScore() = 0;
+	virtual void botOpenPrivacyPolicy() = 0;
 	virtual void botClose() = 0;
 };
 
@@ -124,15 +121,19 @@ private:
 	void setTitle(rpl::producer<QString> title);
 	void sendDataMessage(const QJsonObject &args);
 	void switchInlineQueryMessage(const QJsonObject &args);
-	void processMainButtonMessage(const QJsonObject &args);
+	void processButtonMessage(
+		std::unique_ptr<Button> &button,
+		const QJsonObject &args);
 	void processBackButtonMessage(const QJsonObject &args);
 	void processSettingsButtonMessage(const QJsonObject &args);
 	void processHeaderColor(const QJsonObject &args);
+	void processBottomBarColor(const QJsonObject &args);
 	void openTgLink(const QJsonObject &args);
 	void openExternalLink(const QJsonObject &args);
 	void openInvoice(const QJsonObject &args);
 	void openPopup(const QJsonObject &args);
 	void openScanQrPopup(const QJsonObject &args);
+	void openShareStory(const QJsonObject &args);
 	void requestWriteAccess();
 	void replyRequestWriteAccess(bool allowed);
 	void requestPhone();
@@ -141,7 +142,7 @@ private:
 	void replyCustomMethod(QJsonValue requestId, QJsonObject response);
 	void requestClipboardText(const QJsonObject &args);
 	void setupClosingBehaviour(const QJsonObject &args);
-	void createMainButton();
+	void createButton(std::unique_ptr<Button> &button);
 	void scheduleCloseWithConfirmation();
 	void closeWithConfirmation();
 	void sendViewport();
@@ -155,7 +156,7 @@ private:
 	[[nodiscard]] bool progressWithBackground() const;
 	[[nodiscard]] QRect progressRect() const;
 	void setupProgressGeometry();
-	void updateFooterHeight();
+	void layoutButtons();
 
 	Webview::StorageId _storageId;
 	const not_null<Delegate*> _delegate;
@@ -167,14 +168,16 @@ private:
 	std::unique_ptr<RpWidget> _webviewBottom;
 	rpl::variable<QString> _bottomText;
 	QPointer<RpWidget> _webviewParent;
+	std::unique_ptr<RpWidget> _bottomButtonsBg;
 	std::unique_ptr<Button> _mainButton;
-	mutable crl::time _mainButtonLastClick = 0;
+	std::unique_ptr<Button> _secondaryButton;
+	RectPart _secondaryPosition = RectPart::Left;
 	rpl::variable<int> _footerHeight = 0;
 	std::unique_ptr<Progress> _progress;
 	rpl::event_stream<> _themeUpdateForced;
+	std::optional<QColor> _bottomBarColor;
 	rpl::lifetime _headerColorLifetime;
-	rpl::lifetime _fgLifetime;
-	rpl::lifetime _bgLifetime;
+	rpl::lifetime _bottomBarColorLifetime;
 	bool _webviewProgress = false;
 	bool _themeUpdateScheduled = false;
 	bool _hiddenForPayment = false;

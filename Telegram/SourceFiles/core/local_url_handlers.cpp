@@ -19,9 +19,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "dialogs/ui/dialogs_suggestions.h"
 #include "boxes/background_preview_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/edit_birthday_box.h"
+#include "ui/integration.h"
 #include "payments/payments_non_panel_process.h"
 #include "boxes/share_box.h"
 #include "boxes/connection_box.h"
@@ -33,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "passport/passport_form_controller.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
+#include "data/components/credits.h"
 #include "data/data_birthday.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
@@ -46,6 +49,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_peer_menu.h"
 #include "window/themes/window_theme_editor_box.h" // GenerateSlug.
 #include "payments/payments_checkout_process.h"
+#include "settings/settings_credits.h"
+#include "settings/settings_credits_graphics.h"
 #include "settings/settings_information.h"
 #include "settings/settings_global_ttl.h"
 #include "settings/settings_folders.h"
@@ -919,6 +924,17 @@ bool ShowCollectibleUsername(
 	return true;
 }
 
+bool ShowStarsExamples(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	controller->show(Dialogs::StarsExamplesBox(controller));
+	return true;
+}
+
 void ExportTestChatTheme(
 		not_null<Window::SessionController*> controller,
 		not_null<const Data::CloudTheme*> theme) {
@@ -1170,6 +1186,52 @@ bool ResolveBoost(
 	return true;
 }
 
+bool ResolveTopUp(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto amount = std::clamp(
+		params.value(u"balance"_q).toULongLong(),
+		qulonglong(1),
+		qulonglong(1'000'000));
+	const auto purpose = params.value(u"purpose"_q);
+	const auto weak = base::make_weak(controller);
+	const auto done = [=](::Settings::SmallBalanceResult result) {
+		if (result == ::Settings::SmallBalanceResult::Already) {
+			if (const auto strong = weak.get()) {
+				const auto filter = [=](const auto &...) {
+					strong->showSettings(::Settings::CreditsId());
+					return false;
+				};
+				strong->showToast(Ui::Toast::Config{
+					.text = tr::lng_credits_enough(
+						tr::now,
+						lt_link,
+						Ui::Text::Link(
+							Ui::Text::Bold(
+								tr::lng_credits_enough_link(tr::now))),
+						Ui::Text::RichLangValue),
+					.filter = filter,
+					.duration = 4 * crl::time(1000),
+				});
+			}
+		}
+	};
+	::Settings::MaybeRequestBalanceIncrease(
+		controller->uiShow(),
+		amount,
+		::Settings::SmallBalanceDeepLink{ .purpose = purpose },
+		done);
+	return true;
+}
+
+
 bool ResolveChatLink(
 		Window::SessionController *controller,
 		const Match &match,
@@ -1277,6 +1339,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolveChatLink
 		},
 		{
+			u"^stars_topup/?\\?(.+)(#|$)"_q,
+			ResolveTopUp
+		},
+		{
 			u"^([^\\?]+)(\\?|#|$)"_q,
 			HandleUnknown
 		},
@@ -1326,6 +1392,10 @@ const std::vector<LocalUrlHandler> &InternalUrlHandlers() {
 			u"^collectible_username/([a-zA-Z0-9\\-\\_\\.]+)@([0-9]+)$"_q,
 			ShowCollectibleUsername,
 		},
+		{
+			u"^stars_examples$"_q,
+			ShowStarsExamples,
+		},
 	};
 	return Result;
 }
@@ -1337,6 +1407,13 @@ QString TryConvertUrlToLocal(QString url) {
 
 	using namespace qthelp;
 	auto matchOptions = RegExOption::CaseInsensitive;
+	auto tonsiteMatch = (url.indexOf(u".ton") >= 0)
+		? regex_match(u"^(https?://)?[^/@:]+\\.ton($|/)"_q, url, matchOptions)
+		: RegularExpressionMatch(QRegularExpressionMatch());
+	if (tonsiteMatch) {
+		const auto protocol = tonsiteMatch->captured(1);
+		return u"tonsite://"_q + url.mid(protocol.size());
+	}
 	auto subdomainMatch = regex_match(u"^(https?://)?([a-zA-Z0-9\\_]+)\\.t\\.me(/\\d+)?/?(\\?.+)?"_q, url, matchOptions);
 	if (subdomainMatch) {
 		const auto name = subdomainMatch->captured(2);
