@@ -4185,7 +4185,7 @@ void OverlayWidget::restartAtSeekPosition(crl::time position) {
 	if (_streamingStartPaused) {
 		_streamed->instance.pause();
 	} else {
-		playbackPauseMusic();
+		//playbackPauseMusic();
 	}
 	_streamed->pausedBySeek = false;
 
