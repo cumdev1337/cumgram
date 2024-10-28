@@ -1602,17 +1602,23 @@ void Pip::updatePowerSaveBlocker(const Player::TrackState &state) {
 }
 
 void Pip::updatePlaybackTexts(
-		int64 position,
-		int64 length,
-		int64 frequency) {
+	int64 position,
+	int64 length,
+	int64 frequency) {
 	const auto playAlready = position / frequency;
+	const auto millisecondsAlready = (position * 1000 / frequency) % 1000;  // Calculate milliseconds
+
 	const auto playLeft = (length / frequency) - playAlready;
-	const auto already = Ui::FormatDurationText(playAlready);
+	const auto millisecondsLeft = ((length * 1000 / frequency) % 1000) - millisecondsAlready;  // Calculate milliseconds left
+
+	const auto already = Ui::FormatDurationText(playAlready, millisecondsAlready);
 	const auto minus = QChar(8722);
-	const auto left = minus + Ui::FormatDurationText(playLeft);
+	const auto left = minus + Ui::FormatDurationText(playLeft, millisecondsLeft);
+
 	if (_timeAlready == already && _timeLeft == left) {
 		return;
 	}
+
 	_timeAlready = already;
 	_timeLeft = left;
 	_timeLeftWidth = st::pipPlaybackFont->width(_timeLeft);
@@ -1622,6 +1628,7 @@ void Pip::updatePlaybackTexts(
 		_playback.area.width(),
 		st::pipPlaybackFont->height));
 }
+
 
 void Pip::handleStreamingError(Streaming::Error &&error) {
 	_panel.widget()->close();
